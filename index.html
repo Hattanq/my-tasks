@@ -43,9 +43,10 @@
     background: var(--bg-deep);
     font-family: 'Cairo', sans-serif;
     color: var(--text-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-    position: relative;
+    height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
   }
 
   /* Animated background */
@@ -81,15 +82,28 @@
     50% { opacity: var(--bright, 0.6); transform: scale(1); }
   }
 
-  #app { position: relative; z-index: 1; max-width: 440px; margin: 0 auto; padding-bottom: 100px; }
+  #app {
+    position: relative;
+    z-index: 1;
+    max-width: 440px;
+    margin: 0 auto;
+    height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 100px;
+  }
 
   /* HEADER */
   .header {
-    padding: 50px 20px 20px;
+    padding: 20px 20px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg-deep);
   }
   .header::after {
     content: '';
@@ -692,28 +706,31 @@
   /* Sticky report header */
   .rep-sticky-header {
     position: sticky;
-    top: 0;
+    top: 108px;
     z-index: 50;
     background: var(--bg-deep);
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 12px;
+    padding: 8px 0 0;
+    border-bottom: 1px solid var(--border-glow);
+    margin-bottom: 0;
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
   }
-  .rep-sticky-header .rep-nav-back { margin-bottom: 8px; }
+  .rep-sticky-header .rep-nav-back { margin-bottom: 6px; }
 
   /* Table wrapper with task tabs */
   .task-tabs-wrap {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
-    overflow-x: auto;
-    padding-bottom: 6px;
-    margin-bottom: 14px;
-    scrollbar-width: none;
+    padding: 4px 0 8px 0;
+    margin-bottom: 0;
   }
-  .task-tabs-wrap::-webkit-scrollbar { display: none; }
   .task-tab-btn {
-    flex-shrink: 0;
-    padding: 7px 14px;
+    width: 100%;
+    text-align: center;
+    padding: 8px 6px;
     border-radius: 100px;
     border: 1px solid var(--border);
     background: var(--bg-card);
@@ -741,20 +758,23 @@
     animation: fade-up 0.4s ease;
   }
   .month-table-header {
-    background: rgba(212,175,55,0.08);
-    padding: 12px 16px;
+    padding: 10px 16px;
     font-family: 'Amiri', serif;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--gold);
     text-align: center;
+    background: rgba(212,175,55,0.07);
+    border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
     letter-spacing: 0.5px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
   }
   .month-table-scroll { overflow-x: auto; }
+  .rep-thead-fixed { overflow-x: hidden; background: rgba(8,12,20,0.98); }
+  .rep-table-head { width: 100%; border-collapse: collapse; }
+  .rep-table-body { width: 100%; border-collapse: collapse; }
+  /* إخفاء الـ thead في جدول البيانات */
+  .rep-table-body thead { display: none; }
 
   .rep-table {
     width: 100%;
@@ -763,7 +783,7 @@
     min-width: 340px;
   }
   .rep-table th {
-    background: rgba(212,175,55,0.06);
+    background: rgba(8,12,20,0.98);
     color: var(--gold);
     font-family: 'Amiri', serif;
     font-size: 12px;
@@ -772,9 +792,6 @@
     text-align: center;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
-    position: sticky;
-    top: 0;
-    z-index: 5;
   }
   .rep-table th:first-child { text-align: right; padding-right: 12px; min-width: 58px; }
   .rep-table th:nth-child(2) { min-width: 82px; font-size: 11px; }
@@ -1873,6 +1890,7 @@ function buildTaskTabs(yr,hm,monthName){
   // Clear main content area
   document.getElementById('rep-table-content').innerHTML='<div id="rep-month-table"></div>';
   buildMonthTable(yr,hm,monthName,repState.task);
+  setTimeout(syncStickyPositions, 100);
 }
 
 function selectTaskTab(taskId,yr,hm,monthName,btn){
@@ -1881,6 +1899,7 @@ function selectTaskTab(taskId,yr,hm,monthName,btn){
   document.querySelectorAll('.task-tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   buildMonthTable(yr,hm,monthName,taskId);
+  setTimeout(syncStickyPositions, 100);
 }
 
 function gradeCell(g){
@@ -1951,15 +1970,22 @@ function buildMonthTable(hy,hm,monthName,taskId){
   };
   const icons={prayers:'🕋',sunan:'📿',quran:'📖',dhikr:'✨',morning:'🌙',qiyam:'🌟'};
   const titles={prayers:'متابعة الفروض',sunan:'سنن الرواتب',quran:'ورد القرآن',dhikr:'الأذكار العامة',morning:'أذكار الصباح والمساء',qiyam:'قيام الليل'};
+  // ضع العنوان + رأس الأعمدة في الهيدر الثابت
+  const stickyEl = document.getElementById('rep-table-content-tabs');
+  const tabsEl = stickyEl.querySelector('.task-tabs-wrap');
+  stickyEl.innerHTML = '';
+  if(tabsEl) stickyEl.appendChild(tabsEl);
+  stickyEl.insertAdjacentHTML('beforeend', `
+    <div class="month-table-header">${icons[taskId]} ${titles[taskId]} — ${monthName} ${hy} هـ</div>
+    <div class="rep-thead-fixed">
+      <table class="rep-table rep-table-head"><thead><tr><th>اليوم</th><th>التاريخ</th>${headers[taskId]}</tr></thead></table>
+    </div>`);
+  // الجدول الأسفل يحتوي فقط tbody
   wrap.innerHTML=`
-    <div class="month-table-wrap">
-      <div class="month-table-header">${icons[taskId]} ${titles[taskId]} — ${monthName} ${hy} هـ</div>
-      <div class="month-table-scroll">
-      <table class="rep-table">
-        <thead><tr><th>اليوم</th><th>التاريخ</th>${headers[taskId]}</tr></thead>
+    <div class="month-table-scroll">
+      <table class="rep-table rep-table-body">
         <tbody>${rows}</tbody>
       </table>
-      </div>
     </div>`;
   setTimeout(()=>{
     const tr=wrap.querySelector('.today-row');
@@ -2051,6 +2077,35 @@ function rebuildAllTasks() {
   document.getElementById('card-qiyam').classList.toggle('done', ts['qiyam']!==undefined);
   updateProgress();
 }
+
+
+// ===== SYNC STICKY POSITIONS =====
+function syncStickyPositions() {
+  const header = document.querySelector('.header');
+  const stickyEl = document.querySelector('.rep-sticky-header');
+  if (!header || !stickyEl) return;
+  const headerH = header.offsetHeight;
+  stickyEl.style.top = headerH + 'px';
+  // مزامنة عرض أعمدة thead مع tbody
+  const headTable = document.querySelector('.rep-table-head');
+  const bodyTable = document.querySelector('.rep-table-body');
+  if (headTable && bodyTable) {
+    const headCells = headTable.querySelectorAll('th');
+    const bodyRow = bodyTable.querySelector('tr');
+    if (bodyRow) {
+      const bodyCells = bodyRow.querySelectorAll('td');
+      headCells.forEach((th,i) => {
+        if (bodyCells[i]) {
+          const w = Math.max(th.offsetWidth, bodyCells[i].offsetWidth);
+          th.style.minWidth = w + 'px';
+          bodyCells[i].style.minWidth = w + 'px';
+        }
+      });
+    }
+  }
+}
+window.addEventListener('load', syncStickyPositions);
+window.addEventListener('resize', syncStickyPositions);
 
 // ===================== INIT =====================
 loadState();
